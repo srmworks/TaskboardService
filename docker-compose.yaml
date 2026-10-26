@@ -1,0 +1,40 @@
+# Local smoke test only (not used by Kubernetes).
+#   docker compose up --build    ->  http://localhost:8081
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taskboard
+      POSTGRES_PASSWORD: localdev-only
+      POSTGRES_DB: taskboard
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskboard -d taskboard"]
+      interval: 5s
+      retries: 10
+
+  task-service:
+    build: ./task-service
+    image: srmworks/taskboard-task-service:1.0.0
+    environment:
+      DB_HOST: postgres
+      DB_NAME: taskboard
+      DB_USER: taskboard
+      DB_PASSWORD: localdev-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web-gateway:
+    build: ./web-gateway
+    image: srmworks/taskboard-web-gateway:1.0.0
+    environment:
+      TASK_SERVICE_URL: http://task-service:8000
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      - task-service
+
+volumes:
+  pgdata:
